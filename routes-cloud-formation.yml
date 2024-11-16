@@ -21,9 +21,9 @@ Parameters:
     Type: String
     Default: routes
     Description: Mongo database name
-  MongoConnectionString:
+  MongoConnectionStringParameterArn:
     Type: String
-    Description: Mongo connection string
+    Description: Arn of the mongo connection string parameter in parameter store
 
 Mappings:
   VPCConfig:
@@ -250,6 +250,39 @@ Resources:
         - Type: "forward"
           TargetGroupArn: !Ref "TargetGroup"
 
+  # SSM - Parameter Store
+  ParameterStoreVPCEndpointSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: allow local
+      VpcId: !Ref "VPC"
+      SecurityGroupIngress:
+        - CidrIp: !FindInMap ["VPCConfig", "VPC", "CIDR"]
+          IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+      Tags:
+        - Key: Name
+          Value: !Sub "${ApplicationName}-paramstore-vpcendpoint-sg"
+  ParameterStoreVPCEndpoint:
+    Type: "AWS::EC2::VPCEndpoint"
+    Properties:
+      ServiceName: "com.amazonaws.us-east-1.ssm"
+      PrivateDnsEnabled: true
+      VpcEndpointType: "Interface"
+      PolicyDocument:
+        Statement:
+        - Resource: "*"
+          Action: "*"
+          Effect: "Allow"
+          Principal: "*"
+      SecurityGroupIds:
+      - !Ref ParameterStoreVPCEndpointSG
+      VpcId: !Ref "VPC"
+      SubnetIds:
+      - !Ref PrivateSubnet01
+      - !Ref PrivateSubnet02
+
   # ECS
   LogGroup:
     Type: AWS::Logs::LogGroup
@@ -300,6 +333,8 @@ Resources:
                   - ecr:BatchGetImage
                   - logs:CreateLogStream
                   - logs:PutLogEvents
+                  - ssm:GetParameter
+                  - ssm:GetParameters
                 Resource: "*"
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -323,8 +358,9 @@ Resources:
               Value: !Ref ContainerPort
             - Name: MONGO_DB
               Value: !Ref MongoDBName
+          Secrets:
             - Name: MONGO_CONNECTION_STRING
-              Value: !Ref MongoConnectionString
+              ValueFrom: !Ref MongoConnectionStringParameterArn
           LogConfiguration:
             LogDriver: "awslogs"
             Options:
@@ -410,7 +446,7 @@ Resources:
   Repository:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: !Sub "vitormsp/routes"
+      RepositoryName: "vitormsp/routes"
   CodeBuildRole:
     Type: AWS::IAM::Role
     Properties:
