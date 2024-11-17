@@ -250,39 +250,6 @@ Resources:
         - Type: "forward"
           TargetGroupArn: !Ref "TargetGroup"
 
-  # SSM - Parameter Store
-  ParameterStoreVPCEndpointSG:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: allow local
-      VpcId: !Ref "VPC"
-      SecurityGroupIngress:
-        - CidrIp: !FindInMap ["VPCConfig", "VPC", "CIDR"]
-          IpProtocol: tcp
-          FromPort: 0
-          ToPort: 65535
-      Tags:
-        - Key: Name
-          Value: !Sub "${ApplicationName}-paramstore-vpcendpoint-sg"
-  ParameterStoreVPCEndpoint:
-    Type: "AWS::EC2::VPCEndpoint"
-    Properties:
-      ServiceName: "com.amazonaws.us-east-1.ssm"
-      PrivateDnsEnabled: true
-      VpcEndpointType: "Interface"
-      PolicyDocument:
-        Statement:
-        - Resource: "*"
-          Action: "*"
-          Effect: "Allow"
-          Principal: "*"
-      SecurityGroupIds:
-      - !Ref ParameterStoreVPCEndpointSG
-      VpcId: !Ref "VPC"
-      SubnetIds:
-      - !Ref PrivateSubnet01
-      - !Ref PrivateSubnet02
-
   # ECS
   LogGroup:
     Type: AWS::Logs::LogGroup
